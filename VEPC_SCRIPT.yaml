@@ -1,0 +1,475 @@
+heat_template_version: 2013-05-23
+
+description: >
+  HOT template to create a new neutron network plus a router to the public
+  network, and for deploying 3 Servers for VEPC setup.
+
+parameters:
+  image:
+    type: string
+    description: Name of image to use for servers
+    default: lubuntu
+  flavor:
+    type: string
+    description: Flavor to use for servers
+    default: m1.small
+  public_net:
+    type: string
+    description: >
+     ID or name of public network for which floating IP addresses will be allocated
+    default: public
+  PDN_net_name:
+    type: string
+    description: Name of private network to be created
+    default: PDN
+  PDN_net_cidr:
+    type: string
+    description: Private network address (CIDR notation)
+    default: 30.0.0.0/24
+  PDN_net_gateway:
+    type: string
+    description: Private network gateway address
+    default: 30.0.0.1
+  PDN_net_pool_start:
+    type: string
+    description: Start of private network IP address allocation pool
+    default: 30.0.0.100
+  PDN_net_pool_end:
+    type: string
+    description: End of private network IP address allocation pool
+    default: 30.0.0.200
+    
+  SGI_net_name:
+    type: string
+    description: Name of private network to be created
+    default: SGI
+  SGI_net_cidr:
+    type: string
+    description: Private network address (CIDR notation)
+    default: 20.0.0.0/24
+  SGI_net_gateway:
+    type: string
+    description: Private network gateway address
+    default: 20.0.0.1
+  SGI_net_pool_start:
+    type: string
+    description: Start of private network IP address allocation pool
+    default: 20.0.0.100
+  SGI_net_pool_end:
+    type: string
+    description: End of private network IP address allocation pool
+    default: 20.0.0.200
+  CDPLANE_net_name:
+    type: string
+    description: Name of private network to be created
+    default: C/DPLANE
+  CDPLANE_net_cidr:
+    type: string
+    description: Private network address (CIDR notation)
+    default: 10.10.1.0/24
+  CDPLANE_net_gateway:
+    type: string
+    description: Private network gateway address
+    default: 10.10.1.1
+  CDPLANE_net_pool_start:
+    type: string
+    description: Start of private network IP address allocation pool
+    default: 10.10.1.100
+  CDPLANE_net_pool_end:
+    type: string
+    description: End of private network IP address allocation pool
+    default: 10.10.1.200
+  UE_net_name:
+    type: string
+    description: Name of private network to be created
+    default: UE
+  UE_net_cidr:
+    type: string
+    description: Private network address (CIDR notation)
+    default: 10.10.0.0/24
+  UE_net_gateway:
+    type: string
+    description: Private network gateway address
+    default: 10.10.0.1
+  UE_net_pool_start:
+    type: string
+    description: Start of private network IP address allocation pool
+    default: 10.10.0.100
+  UE_net_pool_end:
+    type: string
+    description: End of private network IP address allocation pool
+    default: 10.10.0.200
+  SBPATH:
+    type: string
+    default: /home/mme/Desktop/nwepc-0.16/ 
+  SPATH:
+    type: string
+    default: /home/mme/Desktop/nwepc-0.16/nw-sae-gw/
+  PATH:
+    type: string
+    default: /home/mme/Desktop/STABLE_RELEASE/Updated_till24th_morning/nwepc-0.16_working/
+  PATH2:
+    type: string
+    default: /home/mme/Desktop/STABLE_RELEASE/Updated_till24th_morning/nwepc-0.16_working/nw-mme-emu/
+  
+resources:
+  PDN_net:
+    type: OS::Neutron::Net
+    properties:
+      name: { get_param: PDN_net_name }
+
+  PDN_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network_id: { get_resource: PDN_net }
+      cidr: { get_param: PDN_net_cidr }
+      gateway_ip: { get_param: PDN_net_gateway }
+      allocation_pools:
+        - start: { get_param: PDN_net_pool_start }
+          end: { get_param: PDN_net_pool_end }
+  SGI_net:
+    type: OS::Neutron::Net
+    properties:
+      name: { get_param: SGI_net_name }
+
+  SGI_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network_id: { get_resource: SGI_net }
+      cidr: { get_param: SGI_net_cidr }
+      gateway_ip: { get_param: SGI_net_gateway }
+      allocation_pools:
+        - start: { get_param: SGI_net_pool_start }
+          end: { get_param: SGI_net_pool_end }
+  
+  CDPLANE_net:
+    type: OS::Neutron::Net
+    properties:
+      name: { get_param: CDPLANE_net_name }
+
+  CDPLANE_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network_id: { get_resource: CDPLANE_net }
+      cidr: { get_param: CDPLANE_net_cidr }
+      gateway_ip: { get_param: CDPLANE_net_gateway }
+      allocation_pools:
+        - start: { get_param: CDPLANE_net_pool_start }
+          end: { get_param: CDPLANE_net_pool_end }
+  UE_net:
+    type: OS::Neutron::Net
+    properties:
+      name: { get_param: UE_net_name }
+
+  UE_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network_id: { get_resource: UE_net }
+      cidr: { get_param: UE_net_cidr }
+      gateway_ip: { get_param: UE_net_gateway }
+      allocation_pools:
+        - start: { get_param: UE_net_pool_start }
+          end: { get_param: UE_net_pool_end }
+  router:
+    type: OS::Neutron::Router
+    properties:
+      external_gateway_info:
+        network: { get_param: public_net }
+
+  router_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: router }
+      subnet_id: { get_resource: PDN_subnet }
+  PDN:
+    type: OS::Nova::Server
+    properties:
+      name: PDN
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      networks:
+        - port: { get_resource: PDN_port1 }
+        - port: { get_resource: PDN_port2 }
+      user_data:
+        str_replace:
+          template: |
+            #cloud-config
+            hostname: PDN
+            fqdn: PDN
+            manage_etc_hosts: true
+            bootcmd:
+              - ifconfig eth1 up
+              - dhclient eth1
+              - echo "1 reth0" >> /etc/iproute2/rt_tables
+              - echo "2 reth1" >> /etc/iproute2/rt_tables
+              - route add default gw $pgateway
+              - ip route add $pcidr dev eth0 table reth0
+              - ip route add $scidr dev eth1 table reth1
+              - ip route add default via $pgateway dev eth0 table reth0
+              - ip rule add from $host0 table reth0
+              - ip rule add from $host1 table reth1
+              - modprobe iptable_nat
+              - iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+              - iptables -A FORWARD -i eth1 -j ACCEPT
+              - echo "1" > /proc/sys/net/ipv4/ip_forward
+
+            runcmd:
+              - sudo su
+              - ip route del default via $sgateway
+              - route add -net $udata gateway $sdata
+             
+              
+          params:
+             $pcidr: { get_param: PDN_net_cidr }
+             $scidr: { get_param: SGI_net_cidr }
+             $pgateway: { get_param: PDN_net_gateway }
+             $sgateway: { get_param: SGI_net_gateway }
+             $sdata: { get_attr: [ SAE_port1, fixed_ips, 0, ip_address ] } 
+             $udata: { get_param: UE_net_cidr } 
+             $host0: { get_attr: [ PDN_port1, fixed_ips, 0, ip_address ] }
+             $host1: { get_attr: [ PDN_port2, fixed_ips, 0, ip_address ] }
+             
+             
+      user_data_format: RAW
+
+  PDN_port1:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: PDN_net }
+      fixed_ips:
+        - subnet_id: { get_resource: PDN_subnet }
+  PDN_port2:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: SGI_net }
+      fixed_ips:
+        - subnet_id: { get_resource: SGI_subnet }
+  
+  
+ 
+  
+  SAE:
+    type: OS::Nova::Server
+    properties:
+      name: SAE
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      networks:
+        - port: { get_resource: SAE_port1 }
+        - port: { get_resource: SAE_port2 }
+        - port: { get_resource: SAE_port3 }
+        - port: { get_resource: SAE_port4 }
+        - port: { get_resource: SAE_port5 }
+      user_data:
+        str_replace:
+          template: |
+            #cloud-config
+            hostname: SAE
+            fqdn: SAE
+            manage_etc_hosts: true
+            bootcmd:
+              - ifconfig eth1 up
+              - dhclient eth1
+              - ifconfig eth2 up
+              - dhclient eth2
+              - ifconfig eth3 up
+              - dhclient eth3
+              - ifconfig eth4 up
+              - dhclient eth4
+              - echo "1 reth0" >> /etc/iproute2/rt_tables
+              - echo "2 reth1" >> /etc/iproute2/rt_tables
+              - echo "3 reth2" >> /etc/iproute2/rt_tables
+              - echo "4 reth3" >> /etc/iproute2/rt_tables
+              - echo "5 reth4" >> /etc/iproute2/rt_tables
+              - ip route add $scidr dev eth0 table reth0
+              - ip route add $ccidr dev eth1 table reth1
+              - ip route add $ccidr dev eth2 table reth2
+              - ip route add $ccidr dev eth3 table reth3
+              - ip route add $ccidr dev eth4 table reth4
+              - ip route add default via $pdndata dev eth0 table reth0
+              - ip route add default via $cgateway dev eth1 table reth1
+              - ip route add default via $cgateway dev eth2 table reth2
+              - ip route add default via $cgateway dev eth3 table reth3
+              - ip route add default via $cgateway dev eth4 table reth4
+              - ip rule add from $host0 table reth0
+              - ip rule add from $host1 table reth1
+              - ip rule add from $host2 table reth2
+              - ip rule add from $host3 table reth3
+              - ip rule add from $host4 table reth4
+              - route add default gw $pdndata
+              - sudo su
+              - cd $sbpath
+              - ./configure
+              - make clean
+              - ./configure
+              - make
+              - sudo make install
+            runcmd:
+              - sudo su
+              - cd $spath
+              - ./nwLteSaeGw --gtpu-ip $host1 --sgw-s11-ip $host2 --sgw-s5-ip $host3 --pgw-s5-ip $host4 --sgi-if eth0 --ippool-subnet 10.10.0.101 --ippool-mask 255.255.255.253 | tee ~/soutputfile.txt
+              
+          params:
+             $scidr: { get_param: SGI_net_cidr }
+             $ccidr: { get_param: CDPLANE_net_cidr }
+             $sbpath: { get_param: SBPATH }
+             $spath: { get_param: SPATH }
+             $pdndata: { get_attr: [ PDN_port2, fixed_ips, 0, ip_address ] }
+             $cgateway: { get_param: CDPLANE_net_gateway }
+             $host0: { get_attr: [ SAE_port1, fixed_ips, 0, ip_address ] }
+             $host1: { get_attr: [ SAE_port2, fixed_ips, 0, ip_address ] }
+             $host2: { get_attr: [ SAE_port3, fixed_ips, 0, ip_address ] }
+             $host3: { get_attr: [ SAE_port4, fixed_ips, 0, ip_address ] }
+             $host4: { get_attr: [ SAE_port5, fixed_ips, 0, ip_address ] }
+         
+      user_data_format: RAW
+  SAE_port1:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: SGI_net }
+      fixed_ips:
+        - subnet_id: { get_resource: SGI_subnet }
+
+  SAE_port2:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: CDPLANE_net }
+      fixed_ips:
+        - subnet_id: { get_resource: CDPLANE_subnet }
+
+  SAE_port3:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: CDPLANE_net }
+      fixed_ips:
+        - subnet_id: { get_resource: CDPLANE_subnet }
+  
+  SAE_port4:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: CDPLANE_net }
+      fixed_ips:
+        - subnet_id: { get_resource: CDPLANE_subnet }
+  
+  SAE_port5:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: CDPLANE_net }
+      fixed_ips:
+        - subnet_id: { get_resource: CDPLANE_subnet }
+
+
+  
+  MME:
+    type: OS::Nova::Server
+    properties:
+      name: MME
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      networks:
+        - port: { get_resource: MME_port1 }
+        - port: { get_resource: MME_port2 }
+        - port: { get_resource: MME_port3 }
+      user_data:
+        str_replace:
+          template: |
+            #cloud-config
+            hostname: MME
+            fqdn: MME
+            manage_etc_hosts: true
+            bootcmd:
+              - ifconfig eth1 up
+              - dhclient eth1
+              - echo "1 reth0" >> /etc/iproute2/rt_tables
+              - echo "2 reth1" >> /etc/iproute2/rt_tables
+              - ip route add $ccidr dev eth0 table reth0
+              - ip route add $ucidr dev eth1 table reth1
+              - ip route add default via $cgateway dev eth0 table reth0
+              - ip route add default via $ugateway dev eth1 table reth1
+              - ip rule add from $host0 table reth0
+              - ip rule add from $host1 table reth1
+              - sudo su
+              - cd $bpath
+              - find ./ -type f -exec sed -i -e 's/pFlowContext->egressEndPoint.ipv4Addr = 168430181;//g' {} \;
+              - cd $bpath
+              - chmod 777 configure 
+              - ./configure
+              - make clean
+              - ./configure
+              - make
+              - sudo make install
+            runcmd:
+              - sudo su
+              - cd $cpath
+              - ./nwLteMmeEmu --mme-ip $host0 --sgw-ip $s1 --pgw-ip $s4 --gtpu-ip $host0 --tun-if eth1 -nu 1 -st 120 -rps 100 | tee ~/moutputfile.txt
+              
+              
+              
+          params:
+             $ccidr: { get_param: CDPLANE_net_cidr }
+             $ucidr: { get_param: UE_net_cidr }
+             $ugateway: { get_param: UE_net_gateway }
+             $cgateway: { get_param: CDPLANE_net_gateway }
+             $host0: { get_attr: [ MME_port1, fixed_ips, 0, ip_address ] }
+             $host1: { get_attr: [ MME_port2, fixed_ips, 0, ip_address ] }
+             $s1: { get_attr: [ SAE_port3, fixed_ips, 0, ip_address ] }
+             $s4: { get_attr: [ SAE_port5, fixed_ips, 0, ip_address ] }
+             $bpath: { get_param: PATH }
+             $cpath: { get_param: PATH2 }
+            
+      user_data_format: RAW
+
+  MME_port1:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: CDPLANE_net }
+      fixed_ips:
+        - subnet_id: { get_resource: CDPLANE_subnet }
+  
+ 
+  MME_port2:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: UE_net }
+      fixed_ips:
+        - subnet_id: { get_resource: UE_subnet }
+  
+  UE:
+    type: OS::Nova::Server
+    properties:
+      name: UE
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      networks:
+        - port: { get_resource: UE_port1 }
+        - port: { get_resource: UE_port2 }
+      user_data:
+        str_replace:
+          template: |
+            #cloud-config
+            hostname: UE
+            fqdn: UE
+            manage_etc_hosts: true
+            bootcmd:
+              - ifconfig eth0 up
+              - dhclient eth1
+              - sudo su
+              - route add default gw $host1
+            runcmd:
+              - sudo su
+              - cd /usr/local/staf
+              - ./STAFEnv.sh
+              - ./startSTAFProc.sh
+              - exit
+              - STAF LOCAL PING PING 
+          params:
+             $host1: { get_attr: [ MME_port2, fixed_ips, 0, ip_address ] }
+      user_data_format: RAW
+  UE_port1:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: UE_net }
+      fixed_ips:
+        - subnet_id: { get_resource: UE_subnet }
+          ip_address: 10.10.0.102 
+  
